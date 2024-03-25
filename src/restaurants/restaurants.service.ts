@@ -8,6 +8,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Restaurant } from './schemas/restaurants.schema';
 import mongoose from 'mongoose';
 import APIFeatures from 'src/utils/apiFeatures.utils';
+import { User } from 'src/auth/schemas/user.schema';
 
 @Injectable()
 export class RestaurantsService {
@@ -26,13 +27,13 @@ export class RestaurantsService {
   }
 
   //create new restaurant => POST /restaurants
-  async create(restaurant: Restaurant): Promise<Restaurant> {
+  async create(restaurant: Restaurant, user: User): Promise<Restaurant> {
     const location = await APIFeatures.getRestaurantLocation(
       restaurant.address,
     );
     console.log(location);
 
-    const data = Object.assign(restaurant, { location: location });
+    const data = Object.assign(restaurant, { user: user._id, location });
     const res = await this.restaurantModel.create(data);
     return res;
   }
