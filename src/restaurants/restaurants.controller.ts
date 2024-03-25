@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Param,
   Post,
@@ -19,8 +20,10 @@ import { CreateRestaurantDto } from './dto/create-restaurant.dto';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '@nestjs/passport';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorators';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { User } from 'src/auth/schemas/user.schema';
+import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { Roles } from 'src/auth/decorators/roles.decorator';
 
 @Controller('restaurants')
 export class RestaurantsController {
@@ -28,14 +31,13 @@ export class RestaurantsController {
 
   @Get()
   @UseGuards(AuthGuard())
-  async getAllRestaurants(
-    @Query() query: ExpressQuery,
-  ): Promise<Restaurant[]> {
+  async getAllRestaurants(@Query() query: ExpressQuery): Promise<Restaurant[]> {
     return this.restaurantService.findAll(query);
   }
 
   @Post()
-  @UseGuards(AuthGuard())
+  @UseGuards(AuthGuard(), RolesGuard)
+  @Roles('admin', 'user')
   async createRestaurant(
     @Body() restaurant: CreateRestaurantDto,
     @CurrentUser() user: User,
@@ -54,8 +56,12 @@ export class RestaurantsController {
   async updateRestaurant(
     @Param('id') id: string,
     @Body() restaurant: UpdateRestaurantDto,
+    @CurrentUser() user: User,
   ): Promise<Restaurant> {
-    await this.restaurantService.findById(id);
+    const res = await this.restaurantService.findById(id);
+    if (res.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException('You can not update this restaurant');
+    }
     return this.restaurantService.updateById(id, restaurant);
   }
 
@@ -63,9 +69,12 @@ export class RestaurantsController {
   @UseGuards(AuthGuard())
   async deleteRestaurant(
     @Param('id') id: string,
+    @CurrentUser() user: User,
   ): Promise<{ deleted: Boolean }> {
     const restaurant = await this.restaurantService.findById(id);
-
+    if (restaurant.user.toString() !== user._id.toString()) {
+      throw new ForbiddenException('You can not update this restaurant');
+    }
     const isDeleted = await this.restaurantService.deleteImages(
       restaurant.images,
     );
